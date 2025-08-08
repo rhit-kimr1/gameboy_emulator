@@ -10,4 +10,12 @@ impl Memory {
             array: [0; MEM_SIZE],
         }
     }
+
+    pub fn read(&mut self, addr: u16) {
+        // TODO
+    }
+
+    pub fn write(&mut self, addr: u16, data: u8) {
+        // TODO
+    }
 }

@@ -12,6 +12,7 @@ pub struct Gameboy {
     f_reg: u8,
     h_reg: u8,
     l_reg: u8,
+    mem: Memory,
 }
 
 impl Gameboy {
@@ -27,38 +28,47 @@ impl Gameboy {
             f_reg: 0,
             h_reg: 0,
             l_reg: 0,
+            mem: Memory::new(),
         }
     }
 
-    pub fn get_af(&self) -> u16 {
+    fn get_af(&self) -> u16 {
         (self.a_reg as u16) << 8 | self.f_reg as u16
     }
-    pub fn set_af(&mut self, value: u16) {
+    fn set_af(&mut self, value: u16) {
         self.a_reg = ((value & 0xFF00) >> 8) as u8;
         self.f_reg = (value & 0xFF) as u8;
     }
 
-    pub fn get_bc(&self) -> u16 {
+    fn get_bc(&self) -> u16 {
         (self.b_reg as u16) << 8 | self.c_reg as u16
     }
-    pub fn set_bc(&mut self, value: u16) {
+    fn set_bc(&mut self, value: u16) {
         self.b_reg = ((value & 0xFF00) >> 8) as u8;
         self.c_reg = (value & 0xFF) as u8;
     }
 
-    pub fn get_de(&self) -> u16 {
+    fn get_de(&self) -> u16 {
         (self.d_reg as u16) << 8 | self.e_reg as u16
     }
-    pub fn set_de(&mut self, value: u16) {
+    fn set_de(&mut self, value: u16) {
         self.d_reg = ((value & 0xFF00) >> 8) as u8;
         self.e_reg = (value & 0xFF) as u8;
     }
 
-    pub fn get_hl(&self) -> u16 {
+    fn get_hl(&self) -> u16 {
         (self.h_reg as u16) << 8 | self.l_reg as u16
     }
-    pub fn set_hl(&mut self, value: u16) {
+    fn set_hl(&mut self, value: u16) {
         self.h_reg = ((value & 0xFF00) >> 8) as u8;
         self.l_reg = (value & 0xFF) as u8;
+    }
+
+    fn tick_system(&mut self) {
+        // TODO
+    }
+
+    pub fn tick(&mut self) {
+
     }
 }
