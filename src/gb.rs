@@ -142,14 +142,14 @@ impl Gameboy {
                     let addr_high = self.read_next() as u16;
                     let addr = (addr_high << 8) | addr_low;
                     self.ld_mem(addr, sp_low);
-                    self.ld_mem(addr + 1, sp_high);
+                    self.ld_mem(addr.wrapping_add(1), sp_high);
                 }
 
                 // JR u8 (Unconditional)
                 (0b00, (0, 1, 1), 0b000) => {
                     let steps = self.read_next() as u16;
                     self.m_tick();
-                    self.pc += steps;
+                    self.pc = self.pc.wrapping_add(steps);
                 }
 
                 // JR cond u8 (Conditional)
@@ -160,28 +160,28 @@ impl Gameboy {
                         (0, 0) => {
                             if self.read_flag(Z_FLAG) == 0 {
                                 self.m_tick();
-                                self.pc += steps;
+                                self.pc = self.pc.wrapping_add(steps);
                             }
                         }
                         // Z
                         (0, 1) => {
                             if self.read_flag(Z_FLAG) == 1 {
                                 self.m_tick();
-                                self.pc += steps;
+                                self.pc = self.pc.wrapping_add(steps);
                             }
                         }
                         // Not C
                         (1, 0) => {
                             if !self.read_flag(C_FLAG) == 0 {
                                 self.m_tick();
-                                self.pc += steps;
+                                self.pc = self.pc.wrapping_add(steps);
                             }
                         }
                         // C
                         (1, 1) => {
                             if self.read_flag(Z_FLAG) == 1 {
                                 self.m_tick();
-                                self.pc += steps;
+                                self.pc = self.pc.wrapping_add(steps);
                             }
                         }
                         (_, _) => {
@@ -264,12 +264,12 @@ impl Gameboy {
                         // HL+
                         (1, 0) => {
                             self.mem.write(self.get_hl(), self.a_reg);
-                            self.set_hl(self.get_hl() + 1);
+                            self.set_hl(self.get_hl().wrapping_add(1));
                         }
                         // HL-
                         (1, 1) => {
                             self.mem.write(self.get_hl(), self.a_reg);
-                            self.set_hl(self.get_hl() - 1);
+                            self.set_hl(self.get_hl().wrapping_sub(1));
                         }
                         (_, _) => {
                             panic!("Invalid value for bits")
@@ -292,12 +292,12 @@ impl Gameboy {
                         // HL+
                         (1, 0) => {
                             self.a_reg = self.mem.read(self.get_hl());
-                            self.set_hl(self.get_hl() + 1);
+                            self.set_hl(self.get_hl().wrapping_add(1));
                         }
                         // HL-
                         (1, 1) => {
                             self.a_reg = self.mem.read(self.get_hl());
-                            self.set_hl(self.get_hl() - 1);
+                            self.set_hl(self.get_hl().wrapping_sub(1));
                         }
                         (_, _) => {
                             panic!("Invalid value for bits")
@@ -311,19 +311,19 @@ impl Gameboy {
                     match (mid_1, mid_2) {
                         // BC
                         (0, 0) => {
-                            self.set_bc(self.get_bc() + 1);
+                            self.set_bc(self.get_bc().wrapping_add(1));
                         }
                         // DE
                         (0, 1) => {
-                            self.set_de(self.get_de() + 1);
+                            self.set_de(self.get_de().wrapping_add(1));
                         }
                         // HL
                         (1, 0) => {
-                            self.set_hl(self.get_hl() + 1);
+                            self.set_hl(self.get_hl().wrapping_add(1));
                         }
                         // SP
                         (1, 1) => {
-                            self.sp += 1;
+                            self.sp = self.sp.wrapping_add(1);
                         }
                         (_, _) => {
                             panic!("Invalid value for bits")
@@ -337,19 +337,19 @@ impl Gameboy {
                     match (mid_1, mid_2) {
                         // BC
                         (0, 0) => {
-                            self.set_bc(self.get_bc() - 1);
+                            self.set_bc(self.get_bc().wrapping_sub(1));
                         }
                         // DE
                         (0, 1) => {
-                            self.set_de(self.get_de() - 1);
+                            self.set_de(self.get_de().wrapping_sub(1));
                         }
                         // HL
                         (1, 0) => {
-                            self.set_hl(self.get_hl() - 1);
+                            self.set_hl(self.get_hl().wrapping_sub(1));
                         }
                         // SP
                         (1, 1) => {
-                            self.sp -= 1;
+                            self.sp = self.sp.wrapping_sub(1);
                         }
                         (_, _) => {
                             panic!("Invalid value for bits")
@@ -678,6 +678,9 @@ impl Gameboy {
                     self.sub_8(self.a_reg, source, 0);
                 }
 
+            // Block 3 (11)
+                
+
             // Nonexistent opcodes
                 (_, _, _) => unimplemented!("Unimplemented opcode: {}", op),
             }
@@ -688,7 +691,7 @@ impl Gameboy {
     fn read_next(&mut self) -> u8 {
         self.m_tick();
         let next = self.mem.read(self.sp);
-        self.sp += 1;
+        self.pc = self.sp.wrapping_add(1);
         next
     }
 
@@ -828,5 +831,16 @@ impl Gameboy {
                 panic!("Invalid value for bits")
             }
         }
+    }
+
+    fn push_8(&mut self, value: u8) {
+
+    }
+
+    fn pop_8(&mut self) -> u8 {
+        self.m_tick();
+        let value = self.mem.read(self.sp);
+        self.pc = self.sp.wrapping_add(1);
+        value
     }
 }
