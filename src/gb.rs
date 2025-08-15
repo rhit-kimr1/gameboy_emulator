@@ -1,5 +1,4 @@
 mod mem;
-use std::str::ParseBoolError;
 
 use crate::gb::mem::Memory;
 
@@ -223,7 +222,6 @@ impl Gameboy {
 
                 // ADD HL, r16
                 (0b00, (_, _, 1), 0b001) => {
-                    self.set_flag(N_FLAG, false);
                     match (mid_1, mid_2) {
                         // BC
                         (0, 0) => {
@@ -361,43 +359,42 @@ impl Gameboy {
 
                 // INC r8
                 (0b00, (_, _, _), 0b100) => {
-                    self.set_flag(N_FLAG, false);
                     match (mid_1, mid_2, mid_3) {
                         // B
                         (0, 0, 0) => {
-                            self.b_reg = self.add_8(self.b_reg, 1, false);
+                            self.b_reg = self.inc_8(self.b_reg);
                         }
                         // C
                         (0, 0, 1) => {
-                            self.c_reg = self.add_8(self.c_reg, 1, false);
+                            self.c_reg = self.inc_8(self.c_reg);
                         }
                         // D
                         (0, 1, 0) => {
-                            self.d_reg = self.add_8(self.d_reg, 1, false);
+                            self.d_reg = self.inc_8(self.d_reg);
                         }
                         // E
                         (0, 1, 1) => {
-                            self.e_reg = self.add_8(self.e_reg, 1, false);
+                            self.e_reg = self.inc_8(self.e_reg);
                         }
                         // H
                         (1, 0, 0) => {
-                            self.h_reg = self.add_8(self.h_reg, 1, false);
+                            self.h_reg = self.inc_8(self.h_reg);
                         }
                         // L
                         (1, 0, 1) => {
-                            self.l_reg = self.add_8(self.l_reg, 1, false);
+                            self.l_reg = self.inc_8(self.l_reg);
                         }
                         // (HL)
                         (1, 1, 0) => {
                             self.m_tick();
                             let value = self.mem.read(self.get_hl());
-                            let result = self.add_8(value, 1, false);
+                            let result = self.inc_8(value);
                             self.m_tick();
                             self.mem.write(self.get_hl(), result);
                         }
                         // A
                         (1, 1, 1) => {
-                            self.a_reg = self.add_8(self.a_reg, 1, false);
+                            self.a_reg = self.inc_8(self.a_reg);
                         }
                         (_, _, _) => {
                             panic!("Invalid value for bits")
@@ -411,39 +408,39 @@ impl Gameboy {
                     match (mid_1, mid_2, mid_3) {
                         // B
                         (0, 0, 0) => {
-                            self.b_reg = self.sub_8(self.b_reg, 1, false);
+                            self.b_reg = self.dec_8(self.b_reg);
                         }
                         // C
                         (0, 0, 1) => {
-                            self.c_reg = self.sub_8(self.c_reg, 1, false);
+                            self.c_reg = self.dec_8(self.c_reg);
                         }
                         // D
                         (0, 1, 0) => {
-                            self.d_reg = self.sub_8(self.d_reg, 1, false);
+                            self.d_reg = self.dec_8(self.d_reg);
                         }
                         // E
                         (0, 1, 1) => {
-                            self.e_reg = self.sub_8(self.e_reg, 1, false);
+                            self.e_reg = self.dec_8(self.e_reg);
                         }
                         // H
                         (1, 0, 0) => {
-                            self.h_reg = self.sub_8(self.h_reg, 1, false);
+                            self.h_reg = self.dec_8(self.h_reg);
                         }
                         // L
                         (1, 0, 1) => {
-                            self.l_reg = self.sub_8(self.l_reg, 1, false);
+                            self.l_reg = self.dec_8(self.l_reg);
                         }
                         // (HL)
                         (1, 1, 0) => {
                             self.m_tick();
                             let value = self.mem.read(self.get_hl());
-                            let result = self.sub_8(value, 1, false);
+                            let result = self.dec_8(value);
                             self.m_tick();
                             self.mem.write(self.get_hl(), result);
                         }
                         // A
                         (1, 1, 1) => {
-                            self.a_reg = self.sub_8(self.a_reg, 1, false);
+                            self.a_reg = self.dec_8(self.a_reg);
                         }
                         (_, _, _) => {
                             panic!("Invalid value for bits")
@@ -575,46 +572,7 @@ impl Gameboy {
 
                 // LD r8, r8
                 (0b01, _, _) => {
-                    // Determine register source from lowest 3 bits
-                    let mut source: u8;
-                    match bottom {
-                        // B
-                        0b000 => {
-                            source = self.b_reg;
-                        }
-                        // C
-                        0b001 => {
-                            source = self.c_reg;
-                        }
-                        // D
-                        0b010 => {
-                            source = self.d_reg;
-                        }
-                        // E
-                        0b011 => {
-                            source = self.e_reg;
-                        }
-                        // H
-                        0b100 => {
-                            source = self.h_reg;
-                        }
-                        // L
-                        0b101 => {
-                            source = self.l_reg;
-                        }
-                        // (HL)
-                        0b110 => {
-                            self.m_tick();
-                            source = self.mem.read(self.get_hl());
-                        }
-                        // A
-                        0b111 => {
-                            source = self.a_reg;
-                        }
-                        _ => {
-                            panic!("Invalid value for bits")
-                        }
-                    }
+                    let source = self.get_r8(bottom as u8);
 
                     // Load into destination determined by middle 3 bits
                     match (mid_1, mid_2, mid_3) {
@@ -656,6 +614,69 @@ impl Gameboy {
                         }
                     }
                 }
+            
+            // Block 2 (10) (ALU A, r8)
+                // ADD
+                (0b10, (0, 0, 0), _) => {
+                    let source = self.get_r8(bottom as u8);
+                    self.a_reg = self.add_8(self.a_reg, source, 0);
+                }
+
+                // ADC
+                (0b10, (0, 0, 1), _) => {
+                    let source = self.get_r8(bottom as u8);
+                    let carry = self.read_flag(C_FLAG);
+                    self.a_reg = self.add_8(self.a_reg, source, carry);
+                }
+
+                // SUB
+                (0b10, (0, 1, 0), _) => {
+                    let source = self.get_r8(bottom as u8);
+                    self.a_reg = self.sub_8(self.a_reg, source, 0);
+                }
+
+                // SBC
+                (0b10, (0, 1, 1), _) => {
+                    let source = self.get_r8(bottom as u8);
+                    let carry = self.read_flag(C_FLAG);
+                    self.a_reg = self.sub_8(self.a_reg, source, carry);
+                }
+
+                // AND
+                (0b10, (1, 0, 0), _) => {
+                    let source = self.get_r8(bottom as u8);
+                    self.a_reg &= source;
+                    self.set_flag(Z_FLAG, self.a_reg == 0);
+                    self.set_flag(N_FLAG, false);
+                    self.set_flag(H_FLAG, true);
+                    self.set_flag(C_FLAG, false);
+                }
+
+                // XOR
+                (0b10, (1, 0, 1), _) => {
+                    let source = self.get_r8(bottom as u8);
+                    self.a_reg ^= source;
+                    self.set_flag(Z_FLAG, self.a_reg == 0);
+                    self.set_flag(N_FLAG, false);
+                    self.set_flag(H_FLAG, false);
+                    self.set_flag(C_FLAG, false);
+                }
+
+                // OR
+                (0b10, (1, 1, 0), _) => {
+                    let source = self.get_r8(bottom as u8);
+                    self.a_reg |= source;
+                    self.set_flag(Z_FLAG, self.a_reg == 0);
+                    self.set_flag(N_FLAG, false);
+                    self.set_flag(H_FLAG, false);
+                    self.set_flag(C_FLAG, false);
+                }
+                
+                // CP
+                (0b10, (1, 1, 1), _) => {
+                    let source = self.get_r8(bottom as u8);
+                    self.sub_8(self.a_reg, source, 0);
+                }
 
             // Nonexistent opcodes
                 (_, _, _) => unimplemented!("Unimplemented opcode: {}", op),
@@ -679,6 +700,7 @@ impl Gameboy {
 
     // 16 bit wrapping addition, updates Half Carry and Carry flags
     fn add_16(&mut self, first: u16, second: u16) -> u16 {
+        self.set_flag(N_FLAG, false);
         self.set_flag(H_FLAG, (first & 0xFFF).overflowing_add(second & 0xFFF).1);
         self.m_tick();
         let result = first.overflowing_add(second);
@@ -686,24 +708,53 @@ impl Gameboy {
         result.0
     }
 
-    // 8 bit wrapping addition, updates Half Carry, Zero, and Carry (If not INC/DEC) flags
-    fn add_8(&mut self, first: u8, second: u8, carry: bool) -> u8 {
-        self.set_flag(H_FLAG, (first & 0xF).overflowing_add(second & 0xF).1);
-        let result = first.overflowing_add(second);
+    // 8 bit wrapping addition, updates Half Carry, Zero, and Carry flags
+    fn add_8(&mut self, first: u8, second: u8, carry: u8) -> u8 {
+        let mut hc = (first & 0xF).overflowing_add(carry).1;
+        let c_result = first.overflowing_add(carry);
+        let mut c = c_result.1;
+
+        hc |= (c_result.0 & 0xF).overflowing_add(second).1;
+        let result = c_result.0.overflowing_add(second);
+        c |= result.1;
+
         self.set_flag(Z_FLAG, result.0 == 0);
-        if carry {
-            self.set_flag(C_FLAG, result.1);
-        }
+        self.set_flag(N_FLAG, false);
+        self.set_flag(H_FLAG, hc);
+        self.set_flag(C_FLAG, c);
         result.0
     }
 
-    fn sub_8(&mut self, first: u8, second: u8, carry: bool) -> u8 {
-        self.set_flag(H_FLAG, (first & 0xF).overflowing_sub(second & 0xF).1);
-        let result = first.overflowing_sub(second);
+    fn inc_8(&mut self, value: u8) -> u8 {
+        let result = value.overflowing_add(1);
         self.set_flag(Z_FLAG, result.0 == 0);
-        if carry {
-            self.set_flag(C_FLAG, result.1);
-        }
+        self.set_flag(N_FLAG, false);
+        self.set_flag(H_FLAG, (value & 0xF).overflowing_add(1).1);
+        result.0
+    }
+
+    // 8 bit wrapping subtraction, updates Half Carry, Zero, and Carry flags
+    fn sub_8(&mut self, first: u8, second: u8, carry: u8) -> u8 {
+        let mut hc = (first & 0xF).overflowing_sub(carry).1;
+        let c_result = first.overflowing_sub(carry);
+        let mut c = c_result.1;
+
+        hc |= (c_result.0 & 0xF).overflowing_sub(second).1;
+        let result = c_result.0.overflowing_sub(second);
+        c |= result.1;
+
+        self.set_flag(Z_FLAG, result.0 == 0);
+        self.set_flag(N_FLAG, true);
+        self.set_flag(H_FLAG, hc);
+        self.set_flag(C_FLAG, c);
+        result.0
+    }
+
+    fn dec_8(&mut self, value: u8) -> u8 {
+        let result = value.overflowing_sub(1);
+        self.set_flag(Z_FLAG, result.0 == 0);
+        self.set_flag(N_FLAG, true);
+        self.set_flag(H_FLAG, (value & 0xF).overflowing_sub(1).1);
         result.0
     }
 
@@ -735,5 +786,47 @@ impl Gameboy {
         self.set_flag(C_FLAG, lowest == 1);
         self.set_flag(Z_FLAG, value == 0);
         value
+    }
+
+    // Retrieves value from the register encoded into 3 bits
+    fn get_r8(&mut self, r8: u8) -> u8 {
+        match r8 {
+            // B
+            0b000 => {
+                self.b_reg
+            }
+            // C
+            0b001 => {
+                self.c_reg
+            }
+            // D
+            0b010 => {
+                self.d_reg
+            }
+            // E
+            0b011 => {
+                self.e_reg
+            }
+            // H
+            0b100 => {
+                self.h_reg
+            }
+            // L
+            0b101 => {
+                self.l_reg
+            }
+            // (HL)
+            0b110 => {
+                self.m_tick();
+                self.mem.read(self.get_hl())
+            }
+            // A
+            0b111 => {
+                self.a_reg
+            }
+            _ => {
+                panic!("Invalid value for bits")
+            }
+        }
     }
 }
