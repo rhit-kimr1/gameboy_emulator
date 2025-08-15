@@ -521,7 +521,7 @@ impl Gameboy {
                         (1, 0, 0) => {
                             let mut offset: u8 = 0;
                             let subtract = self.read_flag(N_FLAG) == 1;
-                            
+
                             if (!subtract && self.a_reg & 0xF > 0x9) || self.read_flag(H_FLAG) == 1 {
                                 offset |= 0x6;
                             }
@@ -560,6 +560,96 @@ impl Gameboy {
                             self.set_flag(H_FLAG, false);
                             let flipped = self.read_flag(C_FLAG) == 0;
                             self.set_flag(C_FLAG, flipped);
+                        }
+                        (_, _, _) => {
+                            panic!("Invalid value for bits")
+                        }
+                    }
+                }
+            
+            // Block 1 (01)
+                // HALT
+                (0b01, (1, 1, 0), 0b110) => {
+                    // TODO
+                }
+
+                // LD r8, r8
+                (0b01, _, _) => {
+                    // Determine register source from lowest 3 bits
+                    let mut source: u8;
+                    match bottom {
+                        // B
+                        0b000 => {
+                            source = self.b_reg;
+                        }
+                        // C
+                        0b001 => {
+                            source = self.c_reg;
+                        }
+                        // D
+                        0b010 => {
+                            source = self.d_reg;
+                        }
+                        // E
+                        0b011 => {
+                            source = self.e_reg;
+                        }
+                        // H
+                        0b100 => {
+                            source = self.h_reg;
+                        }
+                        // L
+                        0b101 => {
+                            source = self.l_reg;
+                        }
+                        // (HL)
+                        0b110 => {
+                            self.m_tick();
+                            source = self.mem.read(self.get_hl());
+                        }
+                        // A
+                        0b111 => {
+                            source = self.a_reg;
+                        }
+                        _ => {
+                            panic!("Invalid value for bits")
+                        }
+                    }
+
+                    // Load into destination determined by middle 3 bits
+                    match (mid_1, mid_2, mid_3) {
+                        // B
+                        (0, 0, 0) => {
+                            self.b_reg = source;
+                        }
+                        // C
+                        (0, 0, 1) => {
+                            self.c_reg = source;
+                        }
+                        // D
+                        (0, 1, 0) => {
+                            self.d_reg = source;
+                        }
+                        // E
+                        (0, 1, 1) => {
+                            self.e_reg = source;
+                        }
+                        // H
+                        (1, 0, 0) => {
+                            self.h_reg = source;
+                        }
+                        // L
+                        (1, 0, 1) => {
+                            self.l_reg = source;
+                        }
+                        // (HL)
+                        (1, 1, 0) => {
+                            self.m_tick();
+                            self.mem.write(self.get_hl(), source);
+                        }
+                        // A
+                        (1, 1, 1) => {
+                            self.a_reg = source;
                         }
                         (_, _, _) => {
                             panic!("Invalid value for bits")
