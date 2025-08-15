@@ -679,7 +679,57 @@ impl Gameboy {
                 }
 
             // Block 3 (11)
-                
+                // RET cond
+                (0b11, (0, _, _), 0b000) => {
+                    self.m_tick();
+                    let cond: bool;
+                    match (mid_2, mid_3) {
+                        // Not Z
+                        (0, 0) => {
+                            cond = self.read_flag(Z_FLAG) == 0;
+                        }
+                        // Z
+                        (0, 1) => {
+                            cond = self.read_flag(Z_FLAG) == 1;
+                        }
+                        // Not C
+                        (1, 0) => {
+                            cond = self.read_flag(C_FLAG) == 0;
+                        }
+                        // C
+                        (1, 1) => {
+                            cond = self.read_flag(C_FLAG) == 1;
+                        }
+                        (_, _) => {
+                            panic!("Invalid value for bits")
+                        }
+                    }
+                    if cond {
+                        let value = self.pop_16();
+                        self.m_tick();
+                        self.pc = value;
+                    }
+                }
+
+                // LD (FF00 + u8), A
+                (0b11, (1, 0, 0), 0b000) => {
+                    let offset = self.read_next() as u16;
+                    self.m_tick();
+                    self.mem.write(0xFF00 + offset, self.a_reg);
+                }
+
+                // LD A, (FF00 + u8)
+                (0b11, (1, 1, 0), 0b000) => {
+                    let offset = self.read_next() as u16;
+                    self.m_tick();
+                    self.a_reg = self.mem.read(0xFF00 + offset);
+                }
+
+                // ADD SP, i8
+                (0b11, (1, 0, 1), 0b000) => {
+                    let value = self.read_next() as i8;
+
+                }
 
             // Nonexistent opcodes
                 (_, _, _) => unimplemented!("Unimplemented opcode: {}", op),
@@ -701,10 +751,10 @@ impl Gameboy {
         self.mem.write(addr, value);
     }
 
-    // 16 bit wrapping addition, updates Half Carry and Carry flags
+    // 16 bit wrapping addition, updates Half Carry and Carry flags based on bits 11 and 15
     fn add_16(&mut self, first: u16, second: u16) -> u16 {
         self.set_flag(N_FLAG, false);
-        self.set_flag(H_FLAG, (first & 0xFFF).overflowing_add(second & 0xFFF).1);
+        self.set_flag(H_FLAG, (first & 0xFFF) + (second & 0xFFF) > 0xFFF);
         self.m_tick();
         let result = first.overflowing_add(second);
         self.set_flag(C_FLAG, result.1);
@@ -713,52 +763,57 @@ impl Gameboy {
 
     // 8 bit wrapping addition, updates Half Carry, Zero, and Carry flags
     fn add_8(&mut self, first: u8, second: u8, carry: u8) -> u8 {
-        let mut hc = (first & 0xF).overflowing_add(carry).1;
         let c_result = first.overflowing_add(carry);
         let mut c = c_result.1;
 
-        hc |= (c_result.0 & 0xF).overflowing_add(second).1;
         let result = c_result.0.overflowing_add(second);
         c |= result.1;
 
         self.set_flag(Z_FLAG, result.0 == 0);
         self.set_flag(N_FLAG, false);
-        self.set_flag(H_FLAG, hc);
+        self.set_flag(H_FLAG, (first & 0xF) + (second & 0xF) + carry > 0xF);
         self.set_flag(C_FLAG, c);
         result.0
     }
 
-    fn inc_8(&mut self, value: u8) -> u8 {
-        let result = value.overflowing_add(1);
-        self.set_flag(Z_FLAG, result.0 == 0);
+    // Adds a signed 8 bit integer to SP and updates Half Carry and Carry flags based on bits 3 and 7
+    fn add_sp_signed(&mut self, small: i8) -> u16 {
+        self.set_flag(Z_FLAG, false);
         self.set_flag(N_FLAG, false);
-        self.set_flag(H_FLAG, (value & 0xF).overflowing_add(1).1);
-        result.0
+        self.set_flag(H_FLAG, (self.sp & 0xF).wrapping_add_signed(small.into()) > 0xF);
+        self.set_flag(C_FLAG, (self.sp & 0xFF).wrapping_add_signed(small.into()) > 0xFF);
+        self.sp.wrapping_add_signed(small.into())
+    }
+
+    fn inc_8(&mut self, value: u8) -> u8 {
+        let result = value.wrapping_add(1);
+        self.set_flag(Z_FLAG, result == 0);
+        self.set_flag(N_FLAG, false);
+        self.set_flag(H_FLAG, (value & 0xF) + 1 > 0xF);
+        result
     }
 
     // 8 bit wrapping subtraction, updates Half Carry, Zero, and Carry flags
     fn sub_8(&mut self, first: u8, second: u8, carry: u8) -> u8 {
-        let mut hc = (first & 0xF).overflowing_sub(carry).1;
         let c_result = first.overflowing_sub(carry);
         let mut c = c_result.1;
 
-        hc |= (c_result.0 & 0xF).overflowing_sub(second).1;
         let result = c_result.0.overflowing_sub(second);
         c |= result.1;
 
         self.set_flag(Z_FLAG, result.0 == 0);
         self.set_flag(N_FLAG, true);
-        self.set_flag(H_FLAG, hc);
+        self.set_flag(H_FLAG, (first & 0xF) < ((second & 0xF) + 1));
         self.set_flag(C_FLAG, c);
         result.0
     }
 
     fn dec_8(&mut self, value: u8) -> u8 {
-        let result = value.overflowing_sub(1);
-        self.set_flag(Z_FLAG, result.0 == 0);
+        let result = value.wrapping_sub(1);
+        self.set_flag(Z_FLAG, result == 0);
         self.set_flag(N_FLAG, true);
-        self.set_flag(H_FLAG, (value & 0xF).overflowing_sub(1).1);
-        result.0
+        self.set_flag(H_FLAG, (value & 0xF) < 1);
+        result
     }
 
     fn rotate_left(&mut self, mut value: u8, c: bool) -> u8 {
