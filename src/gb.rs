@@ -833,14 +833,30 @@ impl Gameboy {
         }
     }
 
-    fn push_8(&mut self, value: u8) {
+    fn push_16(&mut self, value: u16) {
+        let upper = (value >> 8) as u8;
+        let lower = value as u8;
 
+        self.m_tick();
+        self.sp = self.sp.wrapping_sub(1);
+
+        self.m_tick();
+        self.mem.write(self.sp, upper);
+        self.sp = self.sp.wrapping_sub(1);
+
+        self.m_tick();
+        self.mem.write(self.sp, lower);
     }
 
-    fn pop_8(&mut self) -> u8 {
+    fn pop_16(&mut self) -> u16 {
         self.m_tick();
-        let value = self.mem.read(self.sp);
-        self.pc = self.sp.wrapping_add(1);
-        value
+        let lower = self.mem.read(self.sp) as u16;
+        self.sp = self.sp.wrapping_add(1);
+
+        self.m_tick();
+        let upper = self.mem.read(self.sp) as u16;
+        self.sp = self.sp.wrapping_add(1);
+
+        upper << 8 | lower
     }
 }
