@@ -11,8 +11,9 @@ impl Memory {
         }
     }
 
-    pub fn read(&mut self, addr: u16) {
+    pub fn read(&mut self, addr: u16) -> u8 {
         // TODO
+        0
     }
 
     pub fn write(&mut self, addr: u16, data: u8) {
