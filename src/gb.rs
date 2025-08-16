@@ -124,7 +124,80 @@ impl Gameboy {
         let bottom = op & 0b0000_0111;
 
         if prefixed {
+            let initial = self.get_r8(bottom as u8);
+            let result: u8;
+            match block {
+            // Block 0 (00) (Shifts/Rotates)
+                0b00 => {
+                    match middle {
+                        // RLC
+                        (0, 0, 0) => {
+                            result = self.rotate_left(initial, true);
+                        }
 
+                        // RRC
+                        (0, 0, 1) => {
+                            result = self.rotate_right(initial, true);
+                        }
+
+                        // RL
+                        (0, 1, 0) => {
+                            result = self.rotate_left(initial, false);
+                        }
+
+                        // RR
+                        (0, 1, 1) => {
+                            result = self.rotate_right(initial, false);
+                        }
+                        
+                        // SLA
+                        (1, 0, 0) => {
+                            self.set_flag(C_FLAG, (initial >> 7) == 1);
+                            result = initial << 1;
+                        }
+                        
+                        // SRA
+                        (1, 0, 1) => {
+                            self.set_flag(C_FLAG, (initial & 1) == 1);
+                            result = (initial >> 1) | (initial & 0b1000_0000);
+                        }
+                        
+                        // SWAP
+                        (1, 1, 0) => {
+                            result = (initial << 4) | (initial >> 4);
+                        }
+                        
+                        // SRL
+                        (1, 1, 1) => {
+                            self.set_flag(C_FLAG, (initial & 1) == 1);
+                            result = initial >> 1;
+                        }
+                        
+                        (_, _, _) => {
+                            panic!("Invalid value for bits")
+                        }
+                    }
+                    self.set_r8(bottom as u8, result);
+                }
+
+            // Block 1 (01) (BIT bit, r8)
+                0b01 => {
+
+                }
+
+            // Block 2 (10) (RES bit, r8)
+                0b10 => {
+
+                }
+
+            // Block 3 (11) (SET bit, r8)
+                0b11 => {
+
+                }
+
+            // Nonexistent opcodes
+                _ => unimplemented!("Unimplemented opcode: {}", op),
+            }
         } else {
             match (block, middle, bottom) {
             // Block 0 (00)
@@ -358,142 +431,32 @@ impl Gameboy {
                 }
 
                 // INC r8
-                (0b00, (_, _, _), 0b100) => {
-                    match (mid_1, mid_2, mid_3) {
-                        // B
-                        (0, 0, 0) => {
-                            self.b_reg = self.inc_8(self.b_reg);
-                        }
-                        // C
-                        (0, 0, 1) => {
-                            self.c_reg = self.inc_8(self.c_reg);
-                        }
-                        // D
-                        (0, 1, 0) => {
-                            self.d_reg = self.inc_8(self.d_reg);
-                        }
-                        // E
-                        (0, 1, 1) => {
-                            self.e_reg = self.inc_8(self.e_reg);
-                        }
-                        // H
-                        (1, 0, 0) => {
-                            self.h_reg = self.inc_8(self.h_reg);
-                        }
-                        // L
-                        (1, 0, 1) => {
-                            self.l_reg = self.inc_8(self.l_reg);
-                        }
-                        // (HL)
-                        (1, 1, 0) => {
-                            self.m_tick();
-                            let value = self.mem.read(self.get_hl());
-                            let result = self.inc_8(value);
-                            self.m_tick();
-                            self.mem.write(self.get_hl(), result);
-                        }
-                        // A
-                        (1, 1, 1) => {
-                            self.a_reg = self.inc_8(self.a_reg);
-                        }
-                        (_, _, _) => {
-                            panic!("Invalid value for bits")
-                        }
-                    }
+                (0b00, _, 0b100) => {
+                    let r8 = ((middle.0 << 2) | (middle.1 << 1) | middle.2) as u8;
+                    let initial = self.get_r8(r8);
+                    let result = self.inc_8(initial);
+                    self.set_r8(r8, result);
                 }
 
                 // DEC r8
-                (0b00, (_, _, _), 0b101) => {
+                (0b00, _, 0b101) => {
                     self.set_flag(N_FLAG, true);
-                    match (mid_1, mid_2, mid_3) {
-                        // B
-                        (0, 0, 0) => {
-                            self.b_reg = self.dec_8(self.b_reg);
-                        }
-                        // C
-                        (0, 0, 1) => {
-                            self.c_reg = self.dec_8(self.c_reg);
-                        }
-                        // D
-                        (0, 1, 0) => {
-                            self.d_reg = self.dec_8(self.d_reg);
-                        }
-                        // E
-                        (0, 1, 1) => {
-                            self.e_reg = self.dec_8(self.e_reg);
-                        }
-                        // H
-                        (1, 0, 0) => {
-                            self.h_reg = self.dec_8(self.h_reg);
-                        }
-                        // L
-                        (1, 0, 1) => {
-                            self.l_reg = self.dec_8(self.l_reg);
-                        }
-                        // (HL)
-                        (1, 1, 0) => {
-                            self.m_tick();
-                            let value = self.mem.read(self.get_hl());
-                            let result = self.dec_8(value);
-                            self.m_tick();
-                            self.mem.write(self.get_hl(), result);
-                        }
-                        // A
-                        (1, 1, 1) => {
-                            self.a_reg = self.dec_8(self.a_reg);
-                        }
-                        (_, _, _) => {
-                            panic!("Invalid value for bits")
-                        }
-                    }
+                    let r8 = ((middle.0 << 2) | (middle.1 << 1) | middle.2) as u8;
+                    let initial = self.get_r8(r8);
+                    let result = self.dec_8(initial);
+                    self.set_r8(r8, result);
                 }
 
                 // LD r8, u8
-                (0b00, (_, _, _), 0b110) => {
+                (0b00, _, 0b110) => {
+                    let r8 = ((middle.0 << 2) | (middle.1 << 1) | middle.2) as u8;
                     let imm = self.read_next();
-                    match (mid_1, mid_2, mid_3) {
-                        // B
-                        (0, 0, 0) => {
-                            self.b_reg = imm;
-                        }
-                        // C
-                        (0, 0, 1) => {
-                            self.c_reg = imm;
-                        }
-                        // D
-                        (0, 1, 0) => {
-                            self.d_reg = imm;
-                        }
-                        // E
-                        (0, 1, 1) => {
-                            self.e_reg = imm;
-                        }
-                        // H
-                        (1, 0, 0) => {
-                            self.h_reg = imm;
-                        }
-                        // L
-                        (1, 0, 1) => {
-                            self.l_reg = imm;
-                        }
-                        // (HL)
-                        (1, 1, 0) => {
-                            self.m_tick();
-                            self.mem.write(self.get_hl(), imm);
-                        }
-                        // A
-                        (1, 1, 1) => {
-                            self.a_reg = imm;
-                        }
-                        (_, _, _) => {
-                            panic!("Invalid value for bits")
-                        }
-                    }
+                    self.set_r8(r8, imm);
                 }
 
                 // Accumulator/Flag operations
-                (0b00, (_, _, _), 0b111) => {
-                    match (mid_1, mid_2, mid_3) {
+                (0b00, _, 0b111) => {
+                    match middle {
                         // RLCA
                         (0, 0, 0) => {
                             self.a_reg = self.rotate_left(self.a_reg, true);
@@ -572,47 +535,9 @@ impl Gameboy {
 
                 // LD r8, r8
                 (0b01, _, _) => {
+                    let r8 = ((middle.0 << 2) | (middle.1 << 1) | middle.2) as u8;
                     let source = self.get_r8(bottom as u8);
-
-                    // Load into destination determined by middle 3 bits
-                    match (mid_1, mid_2, mid_3) {
-                        // B
-                        (0, 0, 0) => {
-                            self.b_reg = source;
-                        }
-                        // C
-                        (0, 0, 1) => {
-                            self.c_reg = source;
-                        }
-                        // D
-                        (0, 1, 0) => {
-                            self.d_reg = source;
-                        }
-                        // E
-                        (0, 1, 1) => {
-                            self.e_reg = source;
-                        }
-                        // H
-                        (1, 0, 0) => {
-                            self.h_reg = source;
-                        }
-                        // L
-                        (1, 0, 1) => {
-                            self.l_reg = source;
-                        }
-                        // (HL)
-                        (1, 1, 0) => {
-                            self.m_tick();
-                            self.mem.write(self.get_hl(), source);
-                        }
-                        // A
-                        (1, 1, 1) => {
-                            self.a_reg = source;
-                        }
-                        (_, _, _) => {
-                            panic!("Invalid value for bits")
-                        }
-                    }
+                    self.set_r8(r8, source);
                 }
             
             // Block 2 (10) (ALU A, r8)
@@ -938,67 +863,67 @@ impl Gameboy {
                     self.pc = combined;
                 }
 
-            // ALU A, u8
-                // ADD
-                (0b11, (0, 0, 0), 0b110) => {
-                    let operand = self.read_next();
-                    self.a_reg = self.add_8(self.a_reg, operand, 0);
-                }
-
-                // ADC
-                (0b11, (0, 0, 1), 0b110) => {
-                    let operand = self.read_next();
-                    let carry = self.read_flag(C_FLAG);
-                    self.a_reg = self.add_8(self.a_reg, operand, carry);
-                }
-
-                // SUB
-                (0b11, (0, 1, 0), 0b110) => {
-                    let operand = self.read_next();
-                    self.a_reg = self.sub_8(self.a_reg, operand, 0);
-                }
-
-                // SBC
-                (0b11, (0, 1, 1), 0b110) => {
-                    let operand = self.read_next();
-                    let carry = self.read_flag(C_FLAG);
-                    self.a_reg = self.sub_8(self.a_reg, operand, carry);
-                }
-
-                // AND
-                (0b11, (1, 0, 0), 0b110) => {
-                    let operand = self.read_next();
-                    self.a_reg &= operand;
-                    self.set_flag(Z_FLAG, self.a_reg == 0);
-                    self.set_flag(N_FLAG, false);
-                    self.set_flag(H_FLAG, true);
-                    self.set_flag(C_FLAG, false);
-                }
-
-                // XOR
-                (0b11, (1, 0, 1), 0b110) => {
-                    let operand = self.read_next();
-                    self.a_reg ^= operand;
-                    self.set_flag(Z_FLAG, self.a_reg == 0);
-                    self.set_flag(N_FLAG, false);
-                    self.set_flag(H_FLAG, false);
-                    self.set_flag(C_FLAG, false);
-                }
-
-                // OR
-                (0b11, (1, 1, 0), 0b110) => {
-                    let operand = self.read_next();
-                    self.a_reg |= operand;
-                    self.set_flag(Z_FLAG, self.a_reg == 0);
-                    self.set_flag(N_FLAG, false);
-                    self.set_flag(H_FLAG, false);
-                    self.set_flag(C_FLAG, false);
-                }
-                
-                // CP
-                (0b11, (1, 1, 1), 0b110) => {
-                    let operand = self.read_next();
-                    self.sub_8(self.a_reg, operand, 0);
+                // ALU operations
+                (0b11, _, 0b110) => {
+                    match middle {
+                        // ADD
+                        (0, 0, 0) => {
+                            let operand = self.read_next();
+                            self.a_reg = self.add_8(self.a_reg, operand, 0);
+                        }
+                        // ADC
+                        (0, 0, 1) => {
+                            let operand = self.read_next();
+                            let carry = self.read_flag(C_FLAG);
+                            self.a_reg = self.add_8(self.a_reg, operand, carry);
+                        }
+                        // SUB
+                        (0, 1, 0) => {
+                            let operand = self.read_next();
+                            self.a_reg = self.sub_8(self.a_reg, operand, 0);
+                        }
+                        // SBC
+                        (0, 1, 1) => {
+                            let operand = self.read_next();
+                            let carry = self.read_flag(C_FLAG);
+                            self.a_reg = self.sub_8(self.a_reg, operand, carry);
+                        }
+                        // AND
+                        (1, 0, 0) => {
+                            let operand = self.read_next();
+                            self.a_reg &= operand;
+                            self.set_flag(Z_FLAG, self.a_reg == 0);
+                            self.set_flag(N_FLAG, false);
+                            self.set_flag(H_FLAG, true);
+                            self.set_flag(C_FLAG, false);
+                        }
+                        // XOR
+                        (1, 0, 1) => {
+                            let operand = self.read_next();
+                            self.a_reg ^= operand;
+                            self.set_flag(Z_FLAG, self.a_reg == 0);
+                            self.set_flag(N_FLAG, false);
+                            self.set_flag(H_FLAG, false);
+                            self.set_flag(C_FLAG, false);
+                        }
+                        // OR
+                        (1, 1, 0) => {
+                            let operand = self.read_next();
+                            self.a_reg |= operand;
+                            self.set_flag(Z_FLAG, self.a_reg == 0);
+                            self.set_flag(N_FLAG, false);
+                            self.set_flag(H_FLAG, false);
+                            self.set_flag(C_FLAG, false);
+                        }
+                        // CP
+                        (1, 1, 1) => {
+                            let operand = self.read_next();
+                            self.sub_8(self.a_reg, operand, 0);
+                        }
+                        (_, _, _) => {
+                            panic!("Invalid value for bits")
+                        }
+                    }
                 }
 
                 // RST
@@ -1157,6 +1082,48 @@ impl Gameboy {
             // A
             0b111 => {
                 self.a_reg
+            }
+            _ => {
+                panic!("Invalid value for bits")
+            }
+        }
+    }
+
+    // Sets value of the register encoded into 3 bits
+    fn set_r8(&mut self, r8: u8, value: u8) {
+        match r8 {
+            // B
+            0b000 => {
+                self.b_reg = value;
+            }
+            // C
+            0b001 => {
+                self.c_reg = value;
+            }
+            // D
+            0b010 => {
+                self.d_reg = value;
+            }
+            // E
+            0b011 => {
+                self.e_reg = value;
+            }
+            // H
+            0b100 => {
+                self.h_reg = value;
+            }
+            // L
+            0b101 => {
+                self.l_reg = value;
+            }
+            // (HL)
+            0b110 => {
+                self.m_tick();
+                self.mem.write(self.get_hl(), value);
+            }
+            // A
+            0b111 => {
+                self.a_reg = value;
             }
             _ => {
                 panic!("Invalid value for bits")
