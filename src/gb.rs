@@ -182,17 +182,24 @@ impl Gameboy {
 
             // Block 1 (01) (BIT bit, r8)
                 0b01 => {
-
+                    let bit = ((middle.0 << 2) | (middle.1 << 1) | middle.2) as u8;
+                    self.set_flag(Z_FLAG, (initial >> bit) & 1 == 0);
+                    self.set_flag(N_FLAG, false);
+                    self.set_flag(H_FLAG, true);
                 }
 
             // Block 2 (10) (RES bit, r8)
                 0b10 => {
-
+                    let bit = ((middle.0 << 2) | (middle.1 << 1) | middle.2) as u8;
+                    result = initial & !(1 << bit);
+                    self.set_r8(bottom as u8, result);
                 }
 
             // Block 3 (11) (SET bit, r8)
                 0b11 => {
-
+                    let bit = ((middle.0 << 2) | (middle.1 << 1) | middle.2) as u8;
+                    result = initial | (1 << bit);
+                    self.set_r8(bottom as u8, result);
                 }
 
             // Nonexistent opcodes
