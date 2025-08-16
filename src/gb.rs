@@ -728,7 +728,283 @@ impl Gameboy {
                 // ADD SP, i8
                 (0b11, (1, 0, 1), 0b000) => {
                     let value = self.read_next() as i8;
+                    self.m_tick();
+                    self.m_tick();
+                    self.sp = self.add_sp_signed(value);
+                }
 
+                // LD HL, SP + i8
+                (0b11, (1, 1, 1), 0b000) => {
+                    let value = self.read_next() as i8;
+                    self.m_tick();
+                    let result = self.add_sp_signed(value);
+                    self.set_hl(result);
+                }
+
+                // POP r16
+                (0b11, (_, _, 0), 0b001) => {
+                    let value = self.pop_16();
+                    match (mid_1, mid_2) {
+                        // BC
+                        (0, 0) => {
+                            self.set_bc(value);
+                        }
+                        // DE
+                        (0, 1) => {
+                            self.set_de(value);
+                        }
+                        // HL
+                        (1, 0) => {
+                            self.set_hl(value);
+                        }
+                        // AF
+                        (1, 1) => {
+                            self.set_af(value);
+                        }
+                        (_, _) => {
+                            panic!("Invalid value for bits")
+                        }
+                    }
+                }
+
+                // RET
+                (0b11, (0, 0, 1), 0b001) => {
+                    let value = self.pop_16();
+                    self.m_tick();
+                    self.pc = value;
+                }
+
+                // RETI
+                (0b11, (0, 1, 1), 0b001) => {
+                    let value = self.pop_16();
+                    self.m_tick();
+                    self.pc = value;
+                    // TODO Interrupt flags
+                }
+
+                // JP HL
+                (0b11, (1, 0, 1), 0b001) => {
+                    self.pc = self.get_hl();
+                }
+
+                // LD SP, HL
+                (0b11, (1, 1, 1), 0b001) => {
+                    self.sp = self.get_hl();
+                }
+
+                // JP cond
+                (0b11, (0, _, _), 0b010) => {
+                    let lower = self.read_next() as u16;
+                    let higher = self.read_next() as u16;
+                    let combined = (higher << 8) | lower;
+                    let cond: bool;
+                    match (mid_2, mid_3) {
+                        // Not Z
+                        (0, 0) => {
+                            cond = self.read_flag(Z_FLAG) == 0;
+                        }
+                        // Z
+                        (0, 1) => {
+                            cond = self.read_flag(Z_FLAG) == 1;
+                        }
+                        // Not C
+                        (1, 0) => {
+                            cond = self.read_flag(C_FLAG) == 0;
+                        }
+                        // C
+                        (1, 1) => {
+                            cond = self.read_flag(C_FLAG) == 1;
+                        }
+                        (_, _) => {
+                            panic!("Invalid value for bits")
+                        }
+                    }
+                    if cond {
+                        self.m_tick();
+                        self.pc = combined;
+                    }
+                }
+
+                // LD (FF00 + C), A
+                (0b11, (1, 0, 0), 0b010) => {
+                    self.m_tick();
+                    self.mem.write(0xFF00 + (self.c_reg as u16), self.a_reg);
+                }
+
+                // LD A, (FF00 + C)
+                (0b11, (1, 1, 0), 0b010) => {
+                    self.m_tick();
+                    self.a_reg = self.mem.read(0xFF00 + (self.c_reg as u16));
+                }
+
+                // LD (u16), A
+                (0b11, (1, 0, 1), 0b010) => {
+                    let lower = self.read_next() as u16;
+                    let higher = self.read_next() as u16;
+                    self.m_tick();
+                    self.mem.write((higher << 8) | lower, self.a_reg);
+                }
+
+                // LD A, (u16)
+                (0b11, (1, 1, 1), 0b010) => {
+                    let lower = self.read_next() as u16;
+                    let higher = self.read_next() as u16;
+                    self.m_tick();
+                    self.a_reg = self.mem.read((higher << 8) | lower);
+                }
+
+                // JP u16
+                (0b11, (0, 0, 0), 0b011) => {
+                    let lower = self.read_next() as u16;
+                    let higher = self.read_next() as u16;
+                    self.m_tick();
+                    self.pc = (higher << 8) | lower;
+                }
+
+                // DI
+                (0b11, (1, 1, 0), 0b011) => {
+                    // TODO
+                }
+
+                // EI
+                (0b11, (1, 1, 1), 0b011) => {
+                    // TODO
+                }
+
+                // CALL cond
+                (0b11, (0, _, _), 0b100) => {
+                    let lower = self.read_next() as u16;
+                    let higher = self.read_next() as u16;
+                    let combined = (higher << 8) | lower;
+                    let cond: bool;
+                    match (mid_2, mid_3) {
+                        // Not Z
+                        (0, 0) => {
+                            cond = self.read_flag(Z_FLAG) == 0;
+                        }
+                        // Z
+                        (0, 1) => {
+                            cond = self.read_flag(Z_FLAG) == 1;
+                        }
+                        // Not C
+                        (1, 0) => {
+                            cond = self.read_flag(C_FLAG) == 0;
+                        }
+                        // C
+                        (1, 1) => {
+                            cond = self.read_flag(C_FLAG) == 1;
+                        }
+                        (_, _) => {
+                            panic!("Invalid value for bits")
+                        }
+                    }
+                    if cond {
+                        self.push_16(self.pc);
+                        self.pc = combined;
+                    }
+                }
+
+                // PUSH r16
+                (0b11, (_, _, 0), 0b101) => {
+                    match (mid_1, mid_2) {
+                        // BC
+                        (0, 0) => {
+                            self.push_16(self.get_bc());
+                        }
+                        // DE
+                        (0, 1) => {
+                            self.push_16(self.get_de());
+                        }
+                        // HL
+                        (1, 0) => {
+                            self.push_16(self.get_hl());
+                        }
+                        // AF
+                        (1, 1) => {
+                            self.push_16(self.get_af());
+                        }
+                        (_, _) => {
+                            panic!("Invalid value for bits")
+                        }
+                    }
+                }
+
+                // CALL u16
+                (0b11, (0, 0, 1), 0b101) => {
+                    let lower = self.read_next() as u16;
+                    let higher = self.read_next() as u16;
+                    let combined = (higher << 8) | lower;
+                    self.push_16(self.pc);
+                    self.pc = combined;
+                }
+
+            // ALU A, u8
+                // ADD
+                (0b11, (0, 0, 0), 0b110) => {
+                    let operand = self.read_next();
+                    self.a_reg = self.add_8(self.a_reg, operand, 0);
+                }
+
+                // ADC
+                (0b11, (0, 0, 1), 0b110) => {
+                    let operand = self.read_next();
+                    let carry = self.read_flag(C_FLAG);
+                    self.a_reg = self.add_8(self.a_reg, operand, carry);
+                }
+
+                // SUB
+                (0b11, (0, 1, 0), 0b110) => {
+                    let operand = self.read_next();
+                    self.a_reg = self.sub_8(self.a_reg, operand, 0);
+                }
+
+                // SBC
+                (0b11, (0, 1, 1), 0b110) => {
+                    let operand = self.read_next();
+                    let carry = self.read_flag(C_FLAG);
+                    self.a_reg = self.sub_8(self.a_reg, operand, carry);
+                }
+
+                // AND
+                (0b11, (1, 0, 0), 0b110) => {
+                    let operand = self.read_next();
+                    self.a_reg &= operand;
+                    self.set_flag(Z_FLAG, self.a_reg == 0);
+                    self.set_flag(N_FLAG, false);
+                    self.set_flag(H_FLAG, true);
+                    self.set_flag(C_FLAG, false);
+                }
+
+                // XOR
+                (0b11, (1, 0, 1), 0b110) => {
+                    let operand = self.read_next();
+                    self.a_reg ^= operand;
+                    self.set_flag(Z_FLAG, self.a_reg == 0);
+                    self.set_flag(N_FLAG, false);
+                    self.set_flag(H_FLAG, false);
+                    self.set_flag(C_FLAG, false);
+                }
+
+                // OR
+                (0b11, (1, 1, 0), 0b110) => {
+                    let operand = self.read_next();
+                    self.a_reg |= operand;
+                    self.set_flag(Z_FLAG, self.a_reg == 0);
+                    self.set_flag(N_FLAG, false);
+                    self.set_flag(H_FLAG, false);
+                    self.set_flag(C_FLAG, false);
+                }
+                
+                // CP
+                (0b11, (1, 1, 1), 0b110) => {
+                    let operand = self.read_next();
+                    self.sub_8(self.a_reg, operand, 0);
+                }
+
+                // RST
+                (0b11, _, 0b111) => {
+                    self.push_16(self.pc);
+                    self.pc = (mid_1 << 5) | (mid_2 << 4) | (mid_3 << 3);
                 }
 
             // Nonexistent opcodes
@@ -889,14 +1165,14 @@ impl Gameboy {
     }
 
     fn push_16(&mut self, value: u16) {
-        let upper = (value >> 8) as u8;
+        let higher = (value >> 8) as u8;
         let lower = value as u8;
 
         self.m_tick();
         self.sp = self.sp.wrapping_sub(1);
 
         self.m_tick();
-        self.mem.write(self.sp, upper);
+        self.mem.write(self.sp, higher);
         self.sp = self.sp.wrapping_sub(1);
 
         self.m_tick();
@@ -909,9 +1185,9 @@ impl Gameboy {
         self.sp = self.sp.wrapping_add(1);
 
         self.m_tick();
-        let upper = self.mem.read(self.sp) as u16;
+        let higher = self.mem.read(self.sp) as u16;
         self.sp = self.sp.wrapping_add(1);
 
-        upper << 8 | lower
+        higher << 8 | lower
     }
 }
