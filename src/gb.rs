@@ -81,7 +81,7 @@ impl Gameboy {
         }
     }
     fn read_flag(&mut self, flag: u8) -> u8 {
-        if (self.f_reg >> flag) == 0 {
+        if (self.f_reg & (1 << flag)) == 0 {
             0
         } else {
             1
@@ -269,38 +269,31 @@ impl Gameboy {
                 // JR cond s8 (Conditional)
                 (0b00, (1, _, _), 0b000) => {
                     let steps = self.read_next() as i8;
+                    let cond: bool;
                     match (mid_2, mid_3) {
                         // Not Z
                         (0, 0) => {
-                            if self.read_flag(Z_FLAG) == 0 {
-                                self.m_tick();
-                                self.pc = self.pc.wrapping_add_signed(steps as i16);
-                            }
+                            cond = self.read_flag(Z_FLAG) == 0;
                         }
                         // Z
                         (0, 1) => {
-                            if self.read_flag(Z_FLAG) == 1 {
-                                self.m_tick();
-                                self.pc = self.pc.wrapping_add_signed(steps as i16);
-                            }
+                            cond = self.read_flag(Z_FLAG) == 1;
                         }
                         // Not C
                         (1, 0) => {
-                            if self.read_flag(C_FLAG) == 0 {
-                                self.m_tick();
-                                self.pc = self.pc.wrapping_add_signed(steps as i16);
-                            }
+                            cond = self.read_flag(C_FLAG) == 0;
                         }
                         // C
                         (1, 1) => {
-                            if self.read_flag(Z_FLAG) == 1 {
-                                self.m_tick();
-                                self.pc = self.pc.wrapping_add_signed(steps as i16);
-                            }
+                            cond = self.read_flag(C_FLAG) == 1;
                         }
                         (_, _) => {
                             panic!("Invalid value for bits")
                         }
+                    }
+                    if cond {
+                        self.m_tick();
+                        self.pc = self.pc.wrapping_add_signed(steps as i16);
                     }
                 }
 
@@ -527,7 +520,7 @@ impl Gameboy {
                                 offset |= 0x6;
                             }
                             if (!subtract && self.a_reg > 0x99) || self.read_flag(C_FLAG) == 1 {
-                                offset |= 0x66;
+                                offset |= 0x60;
                                 self.set_flag(C_FLAG, true);
                             } else {
                                 self.set_flag(C_FLAG, false);
@@ -725,7 +718,7 @@ impl Gameboy {
                         }
                         // AF
                         (1, 1) => {
-                            self.set_af(value);
+                            self.set_af(value & 0xFFF0);
                         }
                         (_, _) => {
                             panic!("Invalid value for bits")
