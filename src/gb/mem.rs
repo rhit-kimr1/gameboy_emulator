@@ -1,22 +1,127 @@
-const MEM_SIZE: usize = 0xFFFF;
-
 pub struct Memory {
-    array: [u8; MEM_SIZE],
+    // Split into 2 0x4000 arrays when implementing MBCs
+    rom_bank: [u8; 0x8000],
+    vram: [u8; 0x2000],
+    sram: [u8; 0x2000],
+    // Split into 2 0x1000 arrays if upgrading to CGB
+    wram: [u8; 0x2000],
+    oam: [u8; 0xA0],
+    hram: [u8; 0x7F],
+    ie_reg: u8,
 }
 
 impl Memory {
     pub fn new() -> Self {
         Self {
-            array: [0; MEM_SIZE],
+            rom_bank: [0; 0x8000],
+            vram: [0; 0x2000],
+            sram: [0; 0x2000],
+            wram: [0; 0x2000],
+            oam: [0; 0xA0],
+            hram: [0; 0x7F],
+            ie_reg: 0,
         }
     }
 
     pub fn read(&mut self, addr: u16) -> u8 {
-        // TODO
-        0
+        let index = addr as usize;
+        // ROM
+        if addr < 0x8000 {
+            self.rom_bank[index]
+        }
+        // VRAM
+        else if addr < 0xA000 {
+            self.vram[index - 0x8000]
+        }
+        // SRAM
+        else if addr < 0xC000 {
+            self.sram[index - 0xA000]
+        }
+        // WRAM
+        else if addr < 0xE000 {
+            self.wram[index - 0xC000]
+        }
+        // Echo RAM
+        else if addr < 0xFE00 {
+            self.wram[index - 0xE000]
+        }
+        // OAM
+        else if addr < 0xFEA0 {
+            self.oam[index - 0xFE00]
+        }
+        // Prohibited Range
+        else if addr < 0xFF00 {
+            // OAM corruption bug not implemented
+            0
+        }
+        // IO
+        else if addr < 0xFF89 {
+            //Temporary values so tests can run
+            if addr == 0xFF00 {
+                0xCF
+            }
+            else if addr == 0xFF44 {
+                0x90
+            }
+            else {
+                0
+            }
+        }
+        // HRAM
+        else if addr < 0xFFFF {
+            self.hram[index - 0xFF80]
+        }
+        // Interrupt Enable Register
+        else {
+            self.ie_reg
+        }
     }
 
     pub fn write(&mut self, addr: u16, data: u8) {
-        // TODO
+        let index = addr as usize;
+        // ROM (read-only)
+        if addr < 0x8000 {}
+        // VRAM
+        else if addr < 0xA000 {
+            self.vram[index - 0x8000] = data;
+        }
+        // SRAM
+        else if addr < 0xC000 {
+            self.sram[index - 0xA000] = data;
+        }
+        // WRAM
+        else if addr < 0xE000 {
+            self.wram[index - 0xC000] = data;
+        }
+        // Echo RAM
+        else if addr < 0xFE00 {
+            self.wram[index - 0xE000] = data;
+        }
+        // OAM
+        else if addr < 0xFEA0 {
+            self.oam[index - 0xFE00] = data;
+        }
+        // Prohibited Range (read-only)
+        else if addr < 0xFF00 {}
+        // IO
+        else if addr < 0xFF89 {
+            // Capturing writes to Serial Data for tests
+            if addr == 0xFF01 {
+                print!("{}", data);
+            }
+        }
+        // HRAM
+        else if addr < 0xFFFF {
+            self.hram[index - 0xFF80] = data;
+        }
+        // Interrupt Enable Register
+        else {
+            self.ie_reg = data;
+        }
+    }
+
+    pub fn load_rom(&mut self, data: &[u8]) {
+        let end = data.len() as usize;
+        self.rom_bank[0..end].copy_from_slice(data);
     }
 }

@@ -2,6 +2,8 @@ mod mem;
 
 use crate::gb::mem::Memory;
 
+use std::{fs, io::Write};
+
 // Offsets for shifting to the corresponding bits
 const Z_FLAG: u8 = 7;
 const N_FLAG: u8 = 6;
@@ -25,16 +27,16 @@ pub struct Gameboy {
 impl Gameboy {
     pub fn new() -> Self {
         Self {
-            pc: 0,
-            sp: 0,
-            a_reg: 0,
+            pc: 0x100,
+            sp: 0xFFFE,
+            a_reg: 1,
             b_reg: 0,
-            c_reg: 0,
+            c_reg: 0x13,
             d_reg: 0,
-            e_reg: 0,
-            f_reg: 0,
-            h_reg: 0,
-            l_reg: 0,
+            e_reg: 0xD8,
+            f_reg: 0b1000_0000,
+            h_reg: 1,
+            l_reg: 0x4D,
             mem: Memory::new(),
         }
     }
@@ -86,18 +88,40 @@ impl Gameboy {
         }
     }
 
+    pub fn load_rom(&mut self, data: &[u8]) {
+        self.mem.load_rom(data);
+    }
+
     fn tick_system(&mut self) {
         // TODO
     }
 
     fn m_tick(&mut self) {
-        for x in 0..4 {
+        for _x in 0..4 {
             self.tick_system();
         }
     }
 
     pub fn tick(&mut self) {
+        // let mut file = fs::OpenOptions::new()
+        //     .create(true) // Create the file if it doesn't exist
+        //     .write(true) // Enable writing
+        //     .append(true) // Enable appending
+        //     .open("log.txt").unwrap();
+
+        // let mem0 = self.mem.read(self.pc);
+        // let mem1 = self.mem.read(self.pc + 1);
+        // let mem2 = self.mem.read(self.pc + 2);
+        // let mem3 = self.mem.read(self.pc + 3);
+        // let output = format!("A: {:02X} F: {:02X} B: {:02X} C: {:02X} D: {:02X} E: {:02X} H: {:02X} L: {:02X} SP: {:04X} PC: 00:{:04X} ({:02X} {:02X} {:02X} {:02X})\n",
+        //     self.a_reg, self.f_reg, self.b_reg, self.c_reg, self.d_reg, self.e_reg, self.h_reg, self.l_reg, self.sp, self.pc, mem0, mem1, mem2, mem3);
+        // file.write_all(output.as_bytes());
+
+
         let op: u16 = self.fetch();
+
+        println!("Opcode: {:02X}", op);
+        
         self.execute(op);
     }
 
@@ -945,11 +969,11 @@ impl Gameboy {
         }
     }
 
-    // Reads byte at SP and increments SP
+    // Reads byte at PC and increments PC
     fn read_next(&mut self) -> u8 {
         self.m_tick();
-        let next = self.mem.read(self.sp);
-        self.pc = self.sp.wrapping_add(1);
+        let next = self.mem.read(self.pc);
+        self.pc = self.pc.wrapping_add(1);
         next
     }
 
