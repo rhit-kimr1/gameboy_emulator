@@ -55,7 +55,7 @@ impl Memory {
             0
         }
         // IO
-        else if addr < 0xFF89 {
+        else if addr < 0xFF80 {
             //Temporary values so tests can run
             if addr == 0xFF00 {
                 0xCF
@@ -104,7 +104,7 @@ impl Memory {
         // Prohibited Range (read-only)
         else if addr < 0xFF00 {}
         // IO
-        else if addr < 0xFF89 {
+        else if addr < 0xFF80 {
             // Capturing writes to Serial Data for tests
             if addr == 0xFF01 {
                 print!("{}", data);
