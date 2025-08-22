@@ -250,7 +250,7 @@ impl Gameboy {
 
                 // LD (u16), SP
                 (0b00, (0, 0, 1), 0b000) => {
-                    let sp_low = (self.sp & 0xF) as u8;
+                    let sp_low = self.sp as u8;
                     let sp_high = (self.sp >> 8) as u8;
                     let addr_low = self.read_next() as u16;
                     let addr_high = self.read_next() as u16;
