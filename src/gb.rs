@@ -34,7 +34,7 @@ impl Gameboy {
             c_reg: 0x13,
             d_reg: 0,
             e_reg: 0xD8,
-            f_reg: 0b1000_0000,
+            f_reg: 0b1011_0000,
             h_reg: 1,
             l_reg: 0x4D,
             mem: Memory::new(),
@@ -103,25 +103,22 @@ impl Gameboy {
     }
 
     pub fn tick(&mut self) {
-        // let mut file = fs::OpenOptions::new()
-        //     .create(true) // Create the file if it doesn't exist
-        //     .write(true) // Enable writing
-        //     .append(true) // Enable appending
-        //     .open("log.txt").unwrap();
+        let mut file = fs::OpenOptions::new()
+            .create(true) // Create the file if it doesn't exist
+            .write(true) // Enable writing
+            .append(true) // Enable appending
+            .open("log.txt").unwrap();
 
-        // let mem0 = self.mem.read(self.pc);
-        // let mem1 = self.mem.read(self.pc + 1);
-        // let mem2 = self.mem.read(self.pc + 2);
-        // let mem3 = self.mem.read(self.pc + 3);
-        // let output = format!("A: {:02X} F: {:02X} B: {:02X} C: {:02X} D: {:02X} E: {:02X} H: {:02X} L: {:02X} SP: {:04X} PC: 00:{:04X} ({:02X} {:02X} {:02X} {:02X})\n",
-        //     self.a_reg, self.f_reg, self.b_reg, self.c_reg, self.d_reg, self.e_reg, self.h_reg, self.l_reg, self.sp, self.pc, mem0, mem1, mem2, mem3);
-        // file.write_all(output.as_bytes());
+        let mem0 = self.mem.read(self.pc);
+        let mem1 = self.mem.read(self.pc + 1);
+        let mem2 = self.mem.read(self.pc + 2);
+        let mem3 = self.mem.read(self.pc + 3);
+        let output = format!("A: {:02X} F: {:02X} B: {:02X} C: {:02X} D: {:02X} E: {:02X} H: {:02X} L: {:02X} SP: {:04X} PC: 00:{:04X} ({:02X} {:02X} {:02X} {:02X})\n",
+            self.a_reg, self.f_reg, self.b_reg, self.c_reg, self.d_reg, self.e_reg, self.h_reg, self.l_reg, self.sp, self.pc, mem0, mem1, mem2, mem3);
+        let _ = file.write_all(output.as_bytes());
 
 
         let op: u16 = self.fetch();
-
-        println!("Opcode: {:02X}", op);
-        
         self.execute(op);
     }
 
@@ -249,43 +246,43 @@ impl Gameboy {
                     self.ld_mem(addr.wrapping_add(1), sp_high);
                 }
 
-                // JR u8 (Unconditional)
+                // JR s8 (Unconditional)
                 (0b00, (0, 1, 1), 0b000) => {
-                    let steps = self.read_next() as u16;
+                    let steps = self.read_next() as i8;
                     self.m_tick();
-                    self.pc = self.pc.wrapping_add(steps);
+                    self.pc = self.pc.wrapping_add_signed(steps as i16);
                 }
 
-                // JR cond u8 (Conditional)
+                // JR cond s8 (Conditional)
                 (0b00, (1, _, _), 0b000) => {
-                    let steps = self.read_next() as u16;
+                    let steps = self.read_next() as i8;
                     match (mid_2, mid_3) {
                         // Not Z
                         (0, 0) => {
                             if self.read_flag(Z_FLAG) == 0 {
                                 self.m_tick();
-                                self.pc = self.pc.wrapping_add(steps);
+                                self.pc = self.pc.wrapping_add_signed(steps as i16);
                             }
                         }
                         // Z
                         (0, 1) => {
                             if self.read_flag(Z_FLAG) == 1 {
                                 self.m_tick();
-                                self.pc = self.pc.wrapping_add(steps);
+                                self.pc = self.pc.wrapping_add_signed(steps as i16);
                             }
                         }
                         // Not C
                         (1, 0) => {
                             if !self.read_flag(C_FLAG) == 0 {
                                 self.m_tick();
-                                self.pc = self.pc.wrapping_add(steps);
+                                self.pc = self.pc.wrapping_add_signed(steps as i16);
                             }
                         }
                         // C
                         (1, 1) => {
                             if self.read_flag(Z_FLAG) == 1 {
                                 self.m_tick();
-                                self.pc = self.pc.wrapping_add(steps);
+                                self.pc = self.pc.wrapping_add_signed(steps as i16);
                             }
                         }
                         (_, _) => {
