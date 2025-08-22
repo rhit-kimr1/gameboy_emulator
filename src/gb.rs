@@ -175,23 +175,36 @@ impl Gameboy {
                         (1, 0, 0) => {
                             self.set_flag(C_FLAG, (initial >> 7) == 1);
                             result = initial << 1;
+                            self.set_flag(Z_FLAG, result == 0);
+                            self.set_flag(N_FLAG, false);
+                            self.set_flag(H_FLAG, false);
                         }
                         
                         // SRA
                         (1, 0, 1) => {
                             self.set_flag(C_FLAG, (initial & 1) == 1);
                             result = (initial >> 1) | (initial & 0b1000_0000);
+                            self.set_flag(Z_FLAG, result == 0);
+                            self.set_flag(N_FLAG, false);
+                            self.set_flag(H_FLAG, false);
                         }
                         
                         // SWAP
                         (1, 1, 0) => {
                             result = (initial << 4) | (initial >> 4);
+                            self.set_flag(Z_FLAG, result == 0);
+                            self.set_flag(N_FLAG, false);
+                            self.set_flag(H_FLAG, false);
+                            self.set_flag(C_FLAG, false);
                         }
                         
                         // SRL
                         (1, 1, 1) => {
                             self.set_flag(C_FLAG, (initial & 1) == 1);
                             result = initial >> 1;
+                            self.set_flag(Z_FLAG, result == 0);
+                            self.set_flag(N_FLAG, false);
+                            self.set_flag(H_FLAG, false);
                         }
                         
                         (_, _, _) => {
