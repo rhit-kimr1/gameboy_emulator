@@ -286,7 +286,7 @@ impl Gameboy {
                         }
                         // Not C
                         (1, 0) => {
-                            if !self.read_flag(C_FLAG) == 0 {
+                            if self.read_flag(C_FLAG) == 0 {
                                 self.m_tick();
                                 self.pc = self.pc.wrapping_add_signed(steps as i16);
                             }
