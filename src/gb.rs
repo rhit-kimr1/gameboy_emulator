@@ -22,6 +22,8 @@ pub struct Gameboy {
     h_reg: u8,
     l_reg: u8,
     mem: Memory,
+    ime: bool,
+    ime_delay: bool,
 }
 
 impl Gameboy {
@@ -38,6 +40,8 @@ impl Gameboy {
             h_reg: 1,
             l_reg: 0x4D,
             mem: Memory::new(),
+            ime: false,
+            ime_delay: false,
         }
     }
 
@@ -120,6 +124,10 @@ impl Gameboy {
 
         let op: u16 = self.fetch();
         self.execute(op);
+        if self.ime_delay {
+            self.ime_delay = false;
+            self.ime = true;
+        }
     }
 
     fn fetch(&mut self) -> u16 {
@@ -738,7 +746,7 @@ impl Gameboy {
                     let value = self.pop_16();
                     self.m_tick();
                     self.pc = value;
-                    // TODO Interrupt flags
+                    self.ime = true;
                 }
 
                 // JP HL
@@ -822,12 +830,12 @@ impl Gameboy {
 
                 // DI
                 (0b11, (1, 1, 0), 0b011) => {
-                    // TODO
+                    self.ime = false;
                 }
 
                 // EI
                 (0b11, (1, 1, 1), 0b011) => {
-                    // TODO
+                    self.ime_delay = true;
                 }
 
                 // CALL cond
