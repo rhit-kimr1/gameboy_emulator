@@ -103,19 +103,19 @@ impl Gameboy {
     }
 
     pub fn tick(&mut self) {
-        let mut file = fs::OpenOptions::new()
-            .create(true) // Create the file if it doesn't exist
-            .write(true) // Enable writing
-            .append(true) // Enable appending
-            .open("log.txt").unwrap();
+        // let mut file = fs::OpenOptions::new()
+        //     .create(true) // Create the file if it doesn't exist
+        //     .write(true) // Enable writing
+        //     .append(true) // Enable appending
+        //     .open("log.txt").unwrap();
 
-        let mem0 = self.mem.read(self.pc);
-        let mem1 = self.mem.read(self.pc + 1);
-        let mem2 = self.mem.read(self.pc + 2);
-        let mem3 = self.mem.read(self.pc + 3);
-        let output = format!("A: {:02X} F: {:02X} B: {:02X} C: {:02X} D: {:02X} E: {:02X} H: {:02X} L: {:02X} SP: {:04X} PC: 00:{:04X} ({:02X} {:02X} {:02X} {:02X})\n",
-            self.a_reg, self.f_reg, self.b_reg, self.c_reg, self.d_reg, self.e_reg, self.h_reg, self.l_reg, self.sp, self.pc, mem0, mem1, mem2, mem3);
-        let _ = file.write_all(output.as_bytes());
+        // let mem0 = self.mem.read(self.pc);
+        // let mem1 = self.mem.read(self.pc + 1);
+        // let mem2 = self.mem.read(self.pc + 2);
+        // let mem3 = self.mem.read(self.pc + 3);
+        // let output = format!("A: {:02X} F: {:02X} B: {:02X} C: {:02X} D: {:02X} E: {:02X} H: {:02X} L: {:02X} SP: {:04X} PC: 00:{:04X} ({:02X} {:02X} {:02X} {:02X})\n",
+        //     self.a_reg, self.f_reg, self.b_reg, self.c_reg, self.d_reg, self.e_reg, self.h_reg, self.l_reg, self.sp, self.pc, mem0, mem1, mem2, mem3);
+        // let _ = file.write_all(output.as_bytes());
 
 
         let op: u16 = self.fetch();
@@ -1015,8 +1015,8 @@ impl Gameboy {
     fn add_sp_signed(&mut self, small: i8) -> u16 {
         self.set_flag(Z_FLAG, false);
         self.set_flag(N_FLAG, false);
-        self.set_flag(H_FLAG, (self.sp & 0xF).wrapping_add_signed(small.into()) > 0xF);
-        self.set_flag(C_FLAG, (self.sp & 0xFF).wrapping_add_signed(small.into()) > 0xFF);
+        self.set_flag(H_FLAG, (self.sp & 0xF).wrapping_add((small as u16) & 0xF) > 0xF);
+        self.set_flag(C_FLAG, (self.sp & 0xFF).wrapping_add((small as u16) & 0xFF) > 0xFF);
         self.sp.wrapping_add_signed(small.into())
     }
 
