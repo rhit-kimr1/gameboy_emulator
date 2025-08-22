@@ -1032,7 +1032,7 @@ impl Gameboy {
 
         self.set_flag(Z_FLAG, result.0 == 0);
         self.set_flag(N_FLAG, true);
-        self.set_flag(H_FLAG, (first & 0xF) < ((second & 0xF) + 1));
+        self.set_flag(H_FLAG, (first & 0xF) < ((second & 0xF) + carry));
         self.set_flag(C_FLAG, c);
         result.0
     }
