@@ -7,6 +7,10 @@ pub struct Memory {
     wram: [u8; 0x2000],
     oam: [u8; 0xA0],
     hram: [u8; 0x7F],
+    joypad: u8,
+    joypad_buttons: u8,
+    joypad_dpad: u8,
+    if_reg: u8,
     ie_reg: u8,
 }
 
@@ -19,6 +23,10 @@ impl Memory {
             wram: [0; 0x2000],
             oam: [0; 0xA0],
             hram: [0; 0x7F],
+            joypad: 0xCF,
+            joypad_buttons: 0xF,
+            joypad_dpad: 0xF,
+            if_reg: 0,
             ie_reg: 0,
         }
     }
@@ -56,10 +64,33 @@ impl Memory {
         }
         // IO
         else if addr < 0xFF80 {
-            //Temporary values so tests can run
+            // Joypad
             if addr == 0xFF00 {
-                0xCF
+                let select = (self.joypad >> 4) & 0b0011;
+                // None
+                if select == 0b00 {
+                    0xF
+                }
+                // D-Pad
+                else if select == 0b01 {
+                    0x10 | self.joypad_dpad
+                }
+                // Buttons
+                else if select == 0b10 {
+                    0x20 | self.joypad_buttons
+                }
+                // Both
+                else {
+                    0x30 | (self.joypad_buttons & self.joypad_dpad)
+                }
             }
+
+            // Interrupt Flag
+            else if addr == 0xFF04 {
+                self.if_reg
+            }
+            
+            //Temporary values so tests can run
             else if addr == 0xFF44 {
                 0x90
             }
@@ -105,9 +136,19 @@ impl Memory {
         else if addr < 0xFF00 {}
         // IO
         else if addr < 0xFF80 {
+            // Joypad
+            if addr == 0xFF00 {
+                self.joypad = data & 0x30;
+            }
+
+            // Interrupt Flag
+            if addr == 0xFF04 {
+                self.if_reg = data;
+            }
+
             // Capturing writes to Serial Data for tests
             if addr == 0xFF01 {
-                print!("{}", data);
+                print!("{}", data as char);
             }
         }
         // HRAM
@@ -116,7 +157,7 @@ impl Memory {
         }
         // Interrupt Enable Register
         else {
-            self.ie_reg = data;
+            self.ie_reg = data & 0x1F;
         }
     }
 
