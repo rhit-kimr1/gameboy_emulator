@@ -1,4 +1,5 @@
 pub struct Memory {
+    sys_clock: u16,
     // Split into 2 0x4000 arrays when implementing MBCs
     rom_bank: [u8; 0x8000],
     vram: [u8; 0x2000],
@@ -17,6 +18,7 @@ pub struct Memory {
 impl Memory {
     pub fn new() -> Self {
         Self {
+            sys_clock: 0xAB00, 
             rom_bank: [0; 0x8000],
             vram: [0; 0x2000],
             sram: [0; 0x2000],
@@ -33,8 +35,13 @@ impl Memory {
 
     pub fn read(&mut self, addr: u16) -> u8 {
         let index = addr as usize;
+        // Unused Addresses
+        if addr == 0xFF03 || (0xFF08 <= addr) && (addr <= 0xFF0E) || addr == 0xFF15 || addr == 0xFF1F || (0xFF27 <= addr) && (addr <= 0xFF2F) ||
+            (0xFF4C <= addr) && (addr <= 0xFF4E) || (0xFF56 <= addr) && (addr <= 0xFF67) || (0xFF6C <= addr) && (addr <= 0xFF6F) {
+                0xFF
+            }
         // ROM
-        if addr < 0x8000 {
+        else if addr < 0x8000 {
             self.rom_bank[index]
         }
         // VRAM
@@ -85,8 +92,13 @@ impl Memory {
                 }
             }
 
-            // Interrupt Flag
+            // DIV
             else if addr == 0xFF04 {
+                (self.sys_clock >> 8) as u8
+            }
+
+            // Interrupt Flag
+            else if addr == 0xFF0F {
                 self.if_reg
             }
             
@@ -110,39 +122,57 @@ impl Memory {
 
     pub fn write(&mut self, addr: u16, data: u8) {
         let index = addr as usize;
+        // Unused Addresses
+        if addr == 0xFF03 || (0xFF08 <= addr) && (addr <= 0xFF0E) || addr == 0xFF15 || addr == 0xFF1F || (0xFF27 <= addr) && (addr <= 0xFF2F) ||
+            (0xFF4C <= addr) && (addr <= 0xFF4E) || (0xFF56 <= addr) && (addr <= 0xFF67) || (0xFF6C <= addr) && (addr <= 0xFF6F) {
+                // Do nothing
+            }
         // ROM (read-only)
         if addr < 0x8000 {}
         // VRAM
-        else if addr < 0xA000 {
+        if addr < 0xA000 {
             self.vram[index - 0x8000] = data;
         }
         // SRAM
-        else if addr < 0xC000 {
+        if addr < 0xC000 {
             self.sram[index - 0xA000] = data;
         }
         // WRAM
-        else if addr < 0xE000 {
+        if addr < 0xE000 {
             self.wram[index - 0xC000] = data;
         }
         // Echo RAM
-        else if addr < 0xFE00 {
+        if addr < 0xFE00 {
             self.wram[index - 0xE000] = data;
         }
         // OAM
-        else if addr < 0xFEA0 {
+        if addr < 0xFEA0 {
             self.oam[index - 0xFE00] = data;
         }
         // Prohibited Range (read-only)
-        else if addr < 0xFF00 {}
+        if addr < 0xFF00 {}
         // IO
-        else if addr < 0xFF80 {
+        if addr < 0xFF80 {
             // Joypad
             if addr == 0xFF00 {
-                self.joypad = data & 0x30;
+                self.joypad = (data & 0x30) | 0xC0;
+            }
+
+            // Serial
+            if addr == 0xFF01 {
+                // TODO
+            }
+            if addr == 0xFF02 {
+                // TODO
+            }
+
+            // DIV
+            if addr == 0xFF04 {
+                self.sys_clock = 0;
             }
 
             // Interrupt Flag
-            if addr == 0xFF04 {
+            if addr == 0xFF0F {
                 self.if_reg = data;
             }
 
@@ -152,7 +182,7 @@ impl Memory {
             }
         }
         // HRAM
-        else if addr < 0xFFFF {
+        if addr < 0xFFFF {
             self.hram[index - 0xFF80] = data;
         }
         // Interrupt Enable Register
@@ -164,5 +194,10 @@ impl Memory {
     pub fn load_rom(&mut self, data: &[u8]) {
         let end = data.len() as usize;
         self.rom_bank[0..end].copy_from_slice(data);
+    }
+
+    pub fn inc_clk(&mut self) {
+        // Technically inaccurate as DIV should be represented by bits 6-13 instead of 8-15, but the top 2 bits do not motter for DMG
+        self.sys_clock += 4;
     }
 }

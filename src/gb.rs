@@ -104,6 +104,7 @@ impl Gameboy {
         for _x in 0..4 {
             self.tick_system();
         }
+        self.mem.inc_clk();
     }
 
     pub fn tick(&mut self) {
