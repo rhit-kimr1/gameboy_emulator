@@ -101,6 +101,9 @@ impl Gameboy {
     }
 
     fn m_tick(&mut self) {
+        // Checks if TIMA overflowed before moving on to the next M-Cycle
+        self.mem.check_overflow();
+
         for _x in 0..4 {
             self.tick_system();
         }

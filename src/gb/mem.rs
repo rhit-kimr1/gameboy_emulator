@@ -11,6 +11,11 @@ pub struct Memory {
     joypad: u8,
     joypad_buttons: u8,
     joypad_dpad: u8,
+    tima: u8,
+    tma: u8,
+    tac: u8,
+    timer_and: bool,
+    tima_overflowed: bool,
     if_reg: u8,
     ie_reg: u8,
 }
@@ -28,7 +33,12 @@ impl Memory {
             joypad: 0xCF,
             joypad_buttons: 0xF,
             joypad_dpad: 0xF,
-            if_reg: 0,
+            tima: 0,
+            tma: 0,
+            tac: 0xF8,
+            timer_and: false,
+            tima_overflowed: false,
+            if_reg: 0xE1,
             ie_reg: 0,
         }
     }
@@ -75,26 +85,49 @@ impl Memory {
             if addr == 0xFF00 {
                 let select = (self.joypad >> 4) & 0b0011;
                 // None
-                if select == 0b00 {
+                if select == 0b11 {
                     0xF
                 }
                 // D-Pad
-                else if select == 0b01 {
-                    0x10 | self.joypad_dpad
+                else if select == 0b10 {
+                    0xE0 | self.joypad_dpad
                 }
                 // Buttons
-                else if select == 0b10 {
-                    0x20 | self.joypad_buttons
+                else if select == 0b01 {
+                    0xD0 | self.joypad_buttons
                 }
                 // Both
                 else {
-                    0x30 | (self.joypad_buttons & self.joypad_dpad)
+                    0xC0 | (self.joypad_buttons & self.joypad_dpad)
                 }
             }
 
+             // Serial
+            else if addr == 0xFF01 {
+                // TODO
+                0xFF
+            }
+            else if addr == 0xFF02 {
+                // TODO
+                0xFF
+            }
+
+            // Timers
             // DIV
             else if addr == 0xFF04 {
                 (self.sys_clock >> 8) as u8
+            }
+            // TIMA
+            else if addr == 0xFF05 {
+                self.tima
+            }
+            // TMA
+            else if addr == 0xFF06 {
+                self.tma
+            }
+            // TAC
+            else if addr == 0xFF07 {
+                self.tac
             }
 
             // Interrupt Flag
@@ -130,29 +163,29 @@ impl Memory {
         // ROM (read-only)
         if addr < 0x8000 {}
         // VRAM
-        if addr < 0xA000 {
+        else if addr < 0xA000 {
             self.vram[index - 0x8000] = data;
         }
         // SRAM
-        if addr < 0xC000 {
+        else if addr < 0xC000 {
             self.sram[index - 0xA000] = data;
         }
         // WRAM
-        if addr < 0xE000 {
+        else if addr < 0xE000 {
             self.wram[index - 0xC000] = data;
         }
         // Echo RAM
-        if addr < 0xFE00 {
+        else if addr < 0xFE00 {
             self.wram[index - 0xE000] = data;
         }
         // OAM
-        if addr < 0xFEA0 {
+        else if addr < 0xFEA0 {
             self.oam[index - 0xFE00] = data;
         }
         // Prohibited Range (read-only)
-        if addr < 0xFF00 {}
+        else if addr < 0xFF00 {}
         // IO
-        if addr < 0xFF80 {
+        else if addr < 0xFF80 {
             // Joypad
             if addr == 0xFF00 {
                 self.joypad = (data & 0x30) | 0xC0;
@@ -161,28 +194,40 @@ impl Memory {
             // Serial
             if addr == 0xFF01 {
                 // TODO
+
+                // Capturing writes to Serial Data for tests
+                print!("{}", data as char);
             }
             if addr == 0xFF02 {
                 // TODO
             }
 
+            // Timers
             // DIV
             if addr == 0xFF04 {
                 self.sys_clock = 0;
+            }
+            // TIMA
+            if addr == 0xFF05 {
+                self.tima = data;
+                self.tima_overflowed = false;
+            }
+            // TMA
+            if addr == 0xFF06 {
+                self.tma = data;
+            }
+            // TAC
+            if addr == 0xFF07 {
+                self.tac = data | 0xF8;
             }
 
             // Interrupt Flag
             if addr == 0xFF0F {
                 self.if_reg = data;
             }
-
-            // Capturing writes to Serial Data for tests
-            if addr == 0xFF01 {
-                print!("{}", data as char);
-            }
         }
         // HRAM
-        if addr < 0xFFFF {
+        else if addr < 0xFFFF {
             self.hram[index - 0xFF80] = data;
         }
         // Interrupt Enable Register
@@ -198,6 +243,41 @@ impl Memory {
 
     pub fn inc_clk(&mut self) {
         // Technically inaccurate as DIV should be represented by bits 6-13 instead of 8-15, but the top 2 bits do not motter for DMG
-        self.sys_clock += 4;
+        self.sys_clock = self.sys_clock.wrapping_add(4);
+        self.detect_and();
+    }
+
+    fn detect_and(&mut self) {
+        let select = self.tac & 0b11;
+        let clock_bit: u8;
+        let enable = ((self.tac >> 2) & 1) as u16;
+        if select == 0 {
+            clock_bit = 8;
+        }
+        else if select == 1 {
+            clock_bit = 2;
+        }
+        else if select == 2 {
+            clock_bit = 4;
+        }
+        else {
+            clock_bit = 6;
+        }
+        let and_result = (self.sys_clock >> clock_bit) & enable == 1;
+        if self.timer_and && !and_result {
+            if self.tima == 0xFF {
+                self.tima_overflowed = true;
+            }
+            self.tima = self.tima.wrapping_add(1);
+        }
+        self.timer_and = and_result;
+    }
+
+    pub fn check_overflow(&mut self) {
+        if self.tima_overflowed {
+            self.tima_overflowed = false;
+            self.tima = self.tma;
+            self.if_reg |= 0b00100;
+        }
     }
 }
