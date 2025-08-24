@@ -223,7 +223,7 @@ impl Memory {
 
             // Interrupt Flag
             if addr == 0xFF0F {
-                self.if_reg = data;
+                self.if_reg = data | 0xE0;
             }
         }
         // HRAM
@@ -232,7 +232,7 @@ impl Memory {
         }
         // Interrupt Enable Register
         else {
-            self.ie_reg = data & 0x1F;
+            self.ie_reg = data;
         }
     }
 

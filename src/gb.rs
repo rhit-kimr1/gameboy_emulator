@@ -10,6 +10,10 @@ const N_FLAG: u8 = 6;
 const H_FLAG: u8 = 5;
 const C_FLAG: u8 = 4;
 
+// Interrupt register addresses
+const IF_ADDR: u16 = 0xFF0F;
+const IE_ADDR: u16 = 0xFFFF;
+
 pub struct Gameboy {
     pc: u16,
     sp: u16,
@@ -24,6 +28,8 @@ pub struct Gameboy {
     mem: Memory,
     ime: bool,
     ime_delay: bool,
+    halt: bool,
+    halt_bug: bool,
 }
 
 impl Gameboy {
@@ -42,6 +48,8 @@ impl Gameboy {
             mem: Memory::new(),
             ime: false,
             ime_delay: false,
+            halt: false,
+            halt_bug: false,
         }
     }
 
@@ -110,7 +118,53 @@ impl Gameboy {
         self.mem.inc_clk();
     }
 
+    fn handle_interrupts(&mut self) {
+        let if_val = self.mem.read(IF_ADDR);
+        let ie_val = self.mem.read(IE_ADDR);
+        if (self.ime || self.halt) && ((if_val & ie_val & 0b11111) > 0) {
+            self.halt = false;
+            if !self.ime {
+                return;
+            }
+            self.ime = false;
+
+            let handler_addr: u16;
+            // VBlank
+            if (if_val & ie_val & 0b00001) > 0 {
+                handler_addr = 0x0040;
+                self.mem.write(IF_ADDR, if_val ^ 0b00001);
+            }
+            // STAT
+            else if (if_val & ie_val & 0b00010) > 0 {
+                handler_addr = 0x0048;
+                self.mem.write(IF_ADDR, if_val ^ 0b00010);
+            }
+            // Timer
+            else if (if_val & ie_val & 0b00100) > 0 {
+                handler_addr = 0x0050;
+                self.mem.write(IF_ADDR, if_val ^ 0b00100);
+            }
+            // Serial
+            else if (if_val & ie_val & 0b01000) > 0 {
+                handler_addr = 0x0058;
+                self.mem.write(IF_ADDR, if_val ^ 0b01000);
+            }
+            // Joypad
+            else {
+                handler_addr = 0x0060;
+                self.mem.write(IF_ADDR, if_val ^ 0b10000);
+            }
+
+            self.m_tick();
+            self.push_16(self.pc);
+            self.pc = handler_addr;
+        }
+    }
+
     pub fn tick(&mut self) {
+        self.handle_interrupts();
+
+        // Logs CPU state before each instruction
         // let mut file = fs::OpenOptions::new()
         //     .create(true) // Create the file if it doesn't exist
         //     .write(true) // Enable writing
@@ -125,17 +179,26 @@ impl Gameboy {
         //     self.a_reg, self.f_reg, self.b_reg, self.c_reg, self.d_reg, self.e_reg, self.h_reg, self.l_reg, self.sp, self.pc, mem0, mem1, mem2, mem3);
         // let _ = file.write_all(output.as_bytes());
 
-
         let op: u16 = self.fetch();
-        self.execute(op);
         if self.ime_delay {
             self.ime_delay = false;
             self.ime = true;
+        }
+        if self.halt {
+            self.pc = self.pc.wrapping_sub(1);
+        } else {
+            self.execute(op);
         }
     }
 
     fn fetch(&mut self) -> u16 {
         let higher = self.read_next() as u16;
+
+        // HALT bug causes PC to not increment
+        if self.halt_bug {
+            self.pc = self.pc.wrapping_sub(1);
+        }
+
         if higher == 0xCB {
             let lower = self.read_next() as u16;
             (higher << 8) | lower
@@ -576,7 +639,14 @@ impl Gameboy {
             // Block 1 (01)
                 // HALT
                 (0b01, (1, 1, 0), 0b110) => {
-                    // TODO
+                    let if_val = self.mem.read(IF_ADDR);
+                    let ie_val = self.mem.read(IE_ADDR);
+                    // HALT bug occurs if IME = false and an interrupt is pending
+                    if !self.ime && (if_val & ie_val & 0b11111) > 0 {
+                        self.halt_bug = true;
+                    } else {
+                        self.halt = true;
+                    }
                 }
 
                 // LD r8, r8
