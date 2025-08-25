@@ -830,6 +830,7 @@ impl Gameboy {
 
                 // LD SP, HL
                 (0b11, (1, 1, 1), 0b001) => {
+                    self.m_tick();
                     self.sp = self.get_hl();
                 }
 
