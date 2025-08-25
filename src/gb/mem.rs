@@ -134,13 +134,49 @@ impl Memory {
             else if addr == 0xFF0F {
                 self.if_reg
             }
-            
-            //Temporary values so tests can run
-            else if addr == 0xFF44 {
-                0x90
+
+            // Audio
+            else if addr < 0xFF27 {
+                // TODO
+                0xFF
             }
+            // Wave Pattern
+            else if addr < 0xFF40 {
+                // TODO
+                0xFF
+            }
+
+            // LCD
+            // else if addr < 0xFF4C {
+                
+            // }
+
+            // VRAM Bank Select
+            else if addr == 0xFF4F {
+                // TODO if upgrading to CGB
+                0xFF
+            }
+
+            // VRAM DMA
+            else if addr < 0xFF56 {
+                // TODO if upgrading to CGB
+                0xFF
+            }
+
+            // Color Palettes
+            else if addr < 0xFF6C {
+                // TODO if upgrading to CGB
+                0xFF
+            }
+
+            // WRAM Bank Select
+            else if addr == 0xFF70 {
+                // TODO if upgrading to CGB
+                0xFF
+            }
+
             else {
-                0
+                0xFF
             }
         }
         // HRAM
@@ -225,6 +261,35 @@ impl Memory {
             if addr == 0xFF0F {
                 self.if_reg = data | 0xE0;
             }
+
+            // Audio
+            else if addr < 0xFF27 {
+                // TODO
+            }
+            // Wave Pattern
+            else if addr < 0xFF40 {
+                // TODO
+            }
+
+            // VRAM Bank Select
+            else if addr == 0xFF4F {
+                // TODO if upgrading to CGB
+            }
+
+            // VRAM DMA
+            else if addr < 0xFF56 {
+                // TODO if upgrading to CGB
+            }
+
+            // Color Palettes
+            else if addr < 0xFF6C {
+                // TODO if upgrading to CGB
+            }
+
+            // WRAM Bank Select
+            else if addr == 0xFF70 {
+                // TODO if upgrading to CGB
+            }
         }
         // HRAM
         else if addr < 0xFFFF {
@@ -252,16 +317,16 @@ impl Memory {
         let clock_bit: u8;
         let enable = ((self.tac >> 2) & 1) as u16;
         if select == 0 {
-            clock_bit = 8;
+            clock_bit = 9;
         }
         else if select == 1 {
-            clock_bit = 2;
+            clock_bit = 3;
         }
         else if select == 2 {
-            clock_bit = 4;
+            clock_bit = 5;
         }
         else {
-            clock_bit = 6;
+            clock_bit = 7;
         }
         let and_result = (self.sys_clock >> clock_bit) & enable == 1;
         if self.timer_and && !and_result {
