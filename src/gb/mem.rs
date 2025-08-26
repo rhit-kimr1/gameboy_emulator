@@ -1,12 +1,13 @@
+use crate::gb::ppu::Video;
+
 pub struct Memory {
+    ppu: Video,
     sys_clock: u16,
     // Split into 2 0x4000 arrays when implementing MBCs
     rom_bank: [u8; 0x8000],
-    vram: [u8; 0x2000],
     sram: [u8; 0x2000],
     // Split into 2 0x1000 arrays if upgrading to CGB
     wram: [u8; 0x2000],
-    oam: [u8; 0xA0],
     hram: [u8; 0x7F],
     joypad: u8,
     joypad_buttons: u8,
@@ -18,17 +19,19 @@ pub struct Memory {
     tima_overflowed: bool,
     if_reg: u8,
     ie_reg: u8,
+    dma: u8,
+    dma_trigger: bool,
+    dma_counter: u8,
 }
 
 impl Memory {
     pub fn new() -> Self {
         Self {
+            ppu: Video::new(),
             sys_clock: 0xAB00, 
             rom_bank: [0; 0x8000],
-            vram: [0; 0x2000],
             sram: [0; 0x2000],
             wram: [0; 0x2000],
-            oam: [0; 0xA0],
             hram: [0; 0x7F],
             joypad: 0xCF,
             joypad_buttons: 0xF,
@@ -40,7 +43,14 @@ impl Memory {
             tima_overflowed: false,
             if_reg: 0xE1,
             ie_reg: 0,
+            dma: 0xFF,
+            dma_trigger: false,
+            dma_counter: 0,
         }
+    }
+
+    pub fn tick_ppu(&mut self) {
+        self.ppu.tick();
     }
 
     pub fn read(&mut self, addr: u16) -> u8 {
@@ -56,7 +66,7 @@ impl Memory {
         }
         // VRAM
         else if addr < 0xA000 {
-            self.vram[index - 0x8000]
+            self.ppu.read(addr)
         }
         // SRAM
         else if addr < 0xC000 {
@@ -72,7 +82,7 @@ impl Memory {
         }
         // OAM
         else if addr < 0xFEA0 {
-            self.oam[index - 0xFE00]
+            self.ppu.read(addr)
         }
         // Prohibited Range
         else if addr < 0xFF00 {
@@ -147,9 +157,13 @@ impl Memory {
             }
 
             // LCD
-            // else if addr < 0xFF4C {
-                
-            // }
+            else if addr < 0xFF4C {
+                if addr == 0xFF46 {
+                    self.dma
+                } else {
+                    self.ppu.read(addr)
+                }
+            }
 
             // VRAM Bank Select
             else if addr == 0xFF4F {
@@ -200,7 +214,7 @@ impl Memory {
         if addr < 0x8000 {}
         // VRAM
         else if addr < 0xA000 {
-            self.vram[index - 0x8000] = data;
+            self.ppu.write(addr, data);
         }
         // SRAM
         else if addr < 0xC000 {
@@ -216,7 +230,7 @@ impl Memory {
         }
         // OAM
         else if addr < 0xFEA0 {
-            self.oam[index - 0xFE00] = data;
+            self.ppu.write(addr, data);
         }
         // Prohibited Range (read-only)
         else if addr < 0xFF00 {}
@@ -271,6 +285,16 @@ impl Memory {
                 // TODO
             }
 
+            // LCD
+            else if addr < 0xFF4C {
+                if addr == 0xFF46 {
+                    self.dma = data;
+                    self.dma_trigger = true;
+                } else {
+                    self.ppu.write(addr, data);
+                }
+            }
+
             // VRAM Bank Select
             else if addr == 0xFF4F {
                 // TODO if upgrading to CGB
@@ -310,6 +334,7 @@ impl Memory {
         // Technically inaccurate as DIV should be represented by bits 6-13 instead of 8-15, but the top 2 bits do not motter for DMG
         self.sys_clock = self.sys_clock.wrapping_add(4);
         self.detect_and();
+        self.handle_dma();
     }
 
     fn detect_and(&mut self) {
@@ -343,6 +368,26 @@ impl Memory {
             self.tima_overflowed = false;
             self.tima = self.tma;
             self.if_reg |= 0b00100;
+        }
+    }
+
+    // TODO: Need to implement DMA blocking
+    fn handle_dma(&mut self) {
+        if !self.dma_trigger {
+            return;
+        }
+
+        let mut addr = (self.dma as u16) << 8 | self.dma_counter as u16;
+        if addr >= 0xE000 {
+            addr &= 0xDF;
+        }
+        let data = self.read(addr);
+        self.ppu.write(addr, data);
+
+        self.dma_counter += 1;
+        if self.dma_counter >= 160 {
+            self.dma_trigger = false;
+            self.dma_counter = 0;
         }
     }
 }
